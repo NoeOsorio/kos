@@ -37,6 +37,9 @@ logs/
 # Local Claude context (internal only)
 .claude/CLAUDE.local.md
 
+# Brainstorming session files
+.superpowers/
+
 # Python
 *.pyc
 .mypy_cache/
