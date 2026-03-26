@@ -4,14 +4,18 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ["'Fira Code'", "'SF Mono'", 'monospace'],
+        sans: ['-apple-system', 'Inter', 'sans-serif'],
       },
       colors: {
-        brand: {
-          50: '#f0f9ff',
-          500: '#0ea5e9',
-          900: '#0c4a6e',
-        },
+        'bg-deep':        '#05000e',
+        'bg-tool':        '#0e0e12',
+        'bg-card':        '#16161c',
+        'purple-primary': '#8b5cf6',
+        'purple-bright':  '#a78bfa',
+        'purple-soft':    '#c4b5fd',
+        'purple-dim':     '#6d28d9',
+        'text-primary':   '#f0eeff',
       },
     },
   },
