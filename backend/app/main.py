@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.routes import chat, logs, insights, graph
+from app.api.routes import chat, logs, insights, graph, talk
 
 app = FastAPI(
     title="KOS API",
@@ -19,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(talk.router, prefix="/api/talk", tags=["talk"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 app.include_router(insights.router, prefix="/api/insights", tags=["insights"])
 app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
