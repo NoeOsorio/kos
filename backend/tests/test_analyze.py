@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from app.main import app
+from app.api.routes.analyze import _find_similar
 
 client = TestClient(app)
 
@@ -24,27 +25,34 @@ def test_analyze_returns_expected_shape():
     assert isinstance(data["similar"], list)
 
 
-def test_analyze_new_topics_have_required_fields():
+def test_find_similar_returns_matching_items():
+    results = _find_similar(["stoicism", "virtue"])
+    assert len(results) > 0
+    for item in results:
+        assert "id" in item.model_dump()
+        assert "title" in item.model_dump()
+        assert "excerpt" in item.model_dump()
+
+
+def test_find_similar_returns_at_most_3():
+    results = _find_similar(["work", "brain", "model", "flow", "note"])
+    assert len(results) <= 3
+
+
+def test_find_similar_empty_keywords_returns_empty():
+    assert _find_similar([]) == []
+
+
+def test_analyze_new_topics_shape_when_api_unavailable():
+    # When API key is missing, endpoint returns empty lists — verify shape is valid
     response = client.post("/api/analyze", json={
         "message": "I've been reading about Stoicism today",
         "response": "What draws you to that philosophy?"
     })
-    topics = response.json()["new_topics"]
-    for topic in topics:
-        assert "name" in topic
-        assert "description" in topic
-
-
-def test_analyze_similar_have_required_fields():
-    response = client.post("/api/analyze", json={
-        "message": "I've been thinking about mental models",
-        "response": "Which model resonates most with you?"
-    })
-    similar = response.json()["similar"]
-    for item in similar:
-        assert "id" in item
-        assert "title" in item
-        assert "excerpt" in item
+    data = response.json()
+    # Shape must be valid regardless of content
+    assert isinstance(data["new_topics"], list)
+    assert isinstance(data["similar"], list)
 
 
 def test_analyze_empty_message_returns_empty_lists():

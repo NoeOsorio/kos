@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import anthropic
 
 from app.core.config import settings
@@ -101,7 +101,7 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         raw = json.loads(message.content[0].text)
         new_topics = [TopicItem(**t) for t in raw.get("new_topics", [])]
         similar = _find_similar(raw.get("similar_keywords", []))
-    except (json.JSONDecodeError, KeyError, TypeError):
+    except (json.JSONDecodeError, KeyError, TypeError, ValidationError):
         return AnalyzeResponse(new_topics=[], similar=[])
 
     return AnalyzeResponse(new_topics=new_topics, similar=similar)
