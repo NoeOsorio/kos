@@ -40,7 +40,7 @@ class TopicInsightResponse(BaseModel):
 
 @router.post("/topic", response_model=TopicInsightResponse, status_code=201)
 async def save_topic_insight(insight: TopicInsightCreate) -> TopicInsightResponse:
-    # TODO: generate embedding + save to Supabase
+    # TODO: generate embedding + save to Supabase; replace id with UUID from DB insert
     return TopicInsightResponse(
         id="placeholder-" + insight.title.lower().replace(" ", "-"),
         title=insight.title,
