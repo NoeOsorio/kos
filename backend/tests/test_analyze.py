@@ -53,3 +53,6 @@ def test_analyze_empty_message_returns_empty_lists():
         "response": "hello"
     })
     assert response.status_code == 200
+    data = response.json()
+    assert data["new_topics"] == []
+    assert data["similar"] == []
