@@ -20,6 +20,21 @@ export interface KOSCluster {
   spread: number
 }
 
+export interface RawNode {
+  id: string
+  label: string
+  cluster: number
+  connections: string[]
+  insight: string
+  date: string
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  weight: number
+}
+
 export type AppType = 'script' | 'exam' | 'ask' | 'summary' | 'thread'
 
 type ScriptDraft  = { type: 'script';   text: string }
