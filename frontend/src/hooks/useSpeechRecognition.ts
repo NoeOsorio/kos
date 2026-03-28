@@ -12,16 +12,17 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
   const [transcript, setTranscript] = useState('')
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
-  const SpeechRecognitionAPI =
+  const SpeechRecognitionAPIRef = useRef<typeof SpeechRecognition | null>(
     typeof window !== 'undefined'
       ? (window.SpeechRecognition ?? (window as any).webkitSpeechRecognition ?? null)
       : null
+  )
 
-  const isSupported = SpeechRecognitionAPI !== null
+  const isSupported = SpeechRecognitionAPIRef.current !== null
 
   const startListening = useCallback(() => {
-    if (!SpeechRecognitionAPI) return
-    const recognition = new SpeechRecognitionAPI() as SpeechRecognition
+    if (!SpeechRecognitionAPIRef.current) return
+    const recognition = new SpeechRecognitionAPIRef.current() as SpeechRecognition
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = 'en-US'
@@ -29,10 +30,8 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let final = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i]
-        const isFinal = result.isFinal ?? (result[0] as any)?.isFinal
-        if (isFinal) {
-          final += result[0].transcript
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript
         }
       }
       if (final) setTranscript(prev => prev + final)
@@ -43,7 +42,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
     recognitionRef.current = recognition
     recognition.start()
-  }, [SpeechRecognitionAPI])
+  }, [])
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop()

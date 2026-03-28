@@ -47,7 +47,7 @@ describe('useSpeechRecognition', () => {
     act(() => result.current.startListening())
     act(() => {
       mockRecognition.onresult({
-        results: [[{ transcript: 'hello world', isFinal: true }]],
+        results: [Object.assign([{ transcript: 'hello world' }], { isFinal: true })],
         resultIndex: 0,
       } as any)
     })
@@ -59,15 +59,15 @@ describe('useSpeechRecognition', () => {
     act(() => result.current.startListening())
     act(() => {
       mockRecognition.onresult({
-        results: [[{ transcript: 'hello ', isFinal: true }]],
+        results: [Object.assign([{ transcript: 'hello ' }], { isFinal: true })],
         resultIndex: 0,
       } as any)
     })
     act(() => {
       mockRecognition.onresult({
         results: [
-          [{ transcript: 'hello ', isFinal: true }],
-          [{ transcript: 'world', isFinal: true }],
+          Object.assign([{ transcript: 'hello ' }], { isFinal: true }),
+          Object.assign([{ transcript: 'world' }], { isFinal: true }),
         ],
         resultIndex: 1,
       } as any)
@@ -80,7 +80,7 @@ describe('useSpeechRecognition', () => {
     act(() => result.current.startListening())
     act(() => {
       mockRecognition.onresult({
-        results: [[{ transcript: 'hello', isFinal: true }]],
+        results: [Object.assign([{ transcript: 'hello' }], { isFinal: true })],
         resultIndex: 0,
       } as any)
     })
