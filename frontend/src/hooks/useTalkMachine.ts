@@ -9,7 +9,7 @@ export interface VisualParams {
   freqBaseline: number
 }
 
-const VISUAL_PARAMS: Record<TalkState, VisualParams> = {
+export const VISUAL_PARAMS: Record<TalkState, VisualParams> = {
   STANDBY:    { particleSpeed: 0.6, waveAmp: 0.18, ringSpeed: 0.8, freqBaseline: 0.06 },
   LISTENING:  { particleSpeed: 1.4, waveAmp: 0.72, ringSpeed: 1.5, freqBaseline: 0.42 },
   PROCESSING: { particleSpeed: 2.2, waveAmp: 0.38, ringSpeed: 2.5, freqBaseline: 0.35 },
@@ -23,10 +23,15 @@ export interface UseTalkMachineReturn {
   inputText: string
   setInputText: (text: string) => void
   setTranscript: (text: string) => void
+  /** Transition STANDBY → LISTENING. No-op from any other state. */
   activateMic: () => void
-  send: (text: string) => void
+  /** Transition LISTENING → PROCESSING. Caller is responsible for sending text to the API. No-op from any other state. */
+  send: () => void
+  /** Transition PROCESSING → SPEAKING. No-op from any other state. */
   firstTokenReceived: () => void
+  /** Transition SPEAKING → STANDBY. No-op from any other state. */
   streamComplete: () => void
+  /** Transition SPEAKING → PROCESSING. No-op from any other state. */
   followUp: () => void
 }
 
@@ -35,14 +40,29 @@ export function useTalkMachine(): UseTalkMachineReturn {
   const [transcript, setTranscript] = useState('')
   const [inputText, setInputText] = useState('')
 
-  const activateMic = useCallback(() => setTalkState('LISTENING'), [])
-  const send = useCallback((_text: string) => {
-    setInputText('')
-    setTalkState('PROCESSING')
+  const activateMic = useCallback(() => {
+    setTalkState(s => s === 'STANDBY' ? 'LISTENING' : s)
   }, [])
-  const firstTokenReceived = useCallback(() => setTalkState('SPEAKING'), [])
-  const streamComplete = useCallback(() => setTalkState('STANDBY'), [])
-  const followUp = useCallback(() => setTalkState('PROCESSING'), [])
+
+  const send = useCallback(() => {
+    setTalkState(s => {
+      if (s !== 'LISTENING') return s
+      setInputText('')
+      return 'PROCESSING'
+    })
+  }, [])
+
+  const firstTokenReceived = useCallback(() => {
+    setTalkState(s => s === 'PROCESSING' ? 'SPEAKING' : s)
+  }, [])
+
+  const streamComplete = useCallback(() => {
+    setTalkState(s => s === 'SPEAKING' ? 'STANDBY' : s)
+  }, [])
+
+  const followUp = useCallback(() => {
+    setTalkState(s => s === 'SPEAKING' ? 'PROCESSING' : s)
+  }, [])
 
   return {
     talkState,

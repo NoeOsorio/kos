@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react'
-import { useTalkMachine } from '../hooks/useTalkMachine'
+import { useTalkMachine, VISUAL_PARAMS } from '../hooks/useTalkMachine'
 
 describe('useTalkMachine', () => {
   it('initializes in STANDBY', () => {
@@ -16,14 +16,14 @@ describe('useTalkMachine', () => {
   it('transitions LISTENING → PROCESSING on send', () => {
     const { result } = renderHook(() => useTalkMachine())
     act(() => result.current.activateMic())
-    act(() => result.current.send('hello'))
+    act(() => result.current.send())
     expect(result.current.talkState).toBe('PROCESSING')
   })
 
   it('transitions PROCESSING → SPEAKING on firstTokenReceived', () => {
     const { result } = renderHook(() => useTalkMachine())
     act(() => result.current.activateMic())
-    act(() => result.current.send('hello'))
+    act(() => result.current.send())
     act(() => result.current.firstTokenReceived())
     expect(result.current.talkState).toBe('SPEAKING')
   })
@@ -31,7 +31,7 @@ describe('useTalkMachine', () => {
   it('transitions SPEAKING → STANDBY on streamComplete', () => {
     const { result } = renderHook(() => useTalkMachine())
     act(() => result.current.activateMic())
-    act(() => result.current.send('hello'))
+    act(() => result.current.send())
     act(() => result.current.firstTokenReceived())
     act(() => result.current.streamComplete())
     expect(result.current.talkState).toBe('STANDBY')
@@ -40,7 +40,7 @@ describe('useTalkMachine', () => {
   it('transitions SPEAKING → PROCESSING on followUp', () => {
     const { result } = renderHook(() => useTalkMachine())
     act(() => result.current.activateMic())
-    act(() => result.current.send('hello'))
+    act(() => result.current.send())
     act(() => result.current.firstTokenReceived())
     act(() => result.current.followUp())
     expect(result.current.talkState).toBe('PROCESSING')
@@ -48,19 +48,13 @@ describe('useTalkMachine', () => {
 
   it('returns correct visual params for STANDBY', () => {
     const { result } = renderHook(() => useTalkMachine())
-    expect(result.current.visualParams.particleSpeed).toBe(0.6)
-    expect(result.current.visualParams.waveAmp).toBe(0.18)
-    expect(result.current.visualParams.ringSpeed).toBe(0.8)
-    expect(result.current.visualParams.freqBaseline).toBe(0.06)
+    expect(result.current.visualParams).toEqual(VISUAL_PARAMS['STANDBY'])
   })
 
   it('returns correct visual params for LISTENING', () => {
     const { result } = renderHook(() => useTalkMachine())
     act(() => result.current.activateMic())
-    expect(result.current.visualParams.particleSpeed).toBe(1.4)
-    expect(result.current.visualParams.waveAmp).toBe(0.72)
-    expect(result.current.visualParams.ringSpeed).toBe(1.5)
-    expect(result.current.visualParams.freqBaseline).toBe(0.42)
+    expect(result.current.visualParams).toEqual(VISUAL_PARAMS['LISTENING'])
   })
 
   it('setInputText updates inputText', () => {
@@ -71,8 +65,9 @@ describe('useTalkMachine', () => {
 
   it('send clears inputText', () => {
     const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.activateMic())
     act(() => result.current.setInputText('hello'))
-    act(() => result.current.send('hello'))
+    act(() => result.current.send())
     expect(result.current.inputText).toBe('')
   })
 
@@ -80,5 +75,37 @@ describe('useTalkMachine', () => {
     const { result } = renderHook(() => useTalkMachine())
     act(() => result.current.setTranscript('KOS says: hi'))
     expect(result.current.transcript).toBe('KOS says: hi')
+  })
+
+  // Guard tests — illegal transitions are no-ops
+  it('activateMic is no-op when already LISTENING', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.activateMic())
+    expect(result.current.talkState).toBe('LISTENING')
+    act(() => result.current.activateMic())
+    expect(result.current.talkState).toBe('LISTENING')
+  })
+
+  it('send is no-op when not LISTENING', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    // From STANDBY
+    act(() => result.current.send())
+    expect(result.current.talkState).toBe('STANDBY')
+    // From PROCESSING
+    act(() => result.current.activateMic())
+    act(() => result.current.send())
+    act(() => result.current.send())
+    expect(result.current.talkState).toBe('PROCESSING')
+  })
+
+  it('streamComplete is no-op when not SPEAKING', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    // From STANDBY
+    act(() => result.current.streamComplete())
+    expect(result.current.talkState).toBe('STANDBY')
+    // From LISTENING
+    act(() => result.current.activateMic())
+    act(() => result.current.streamComplete())
+    expect(result.current.talkState).toBe('LISTENING')
   })
 })
