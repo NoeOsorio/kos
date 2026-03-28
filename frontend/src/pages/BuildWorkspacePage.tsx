@@ -90,7 +90,7 @@ export default function BuildWorkspacePage() {
     setLength(session.length ?? '')
     setSourceIds(session.sourceIds)
     setDraft(session.draft)
-  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, getSession])
 
   function toggleSource(id: string) {
     setSourceIds(prev =>

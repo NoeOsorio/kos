@@ -16,9 +16,9 @@ interface WorkspaceSidebarProps {
   appType: AppType
   topic: string
   onTopicChange: (v: string) => void
-  format: string
+  format: string  // maps to: script→Format, exam→Difficulty, summary→Depth, thread→Platform
   onFormatChange: (v: string) => void
-  length: string
+  length: string  // maps to: script→Length, exam→Questions, summary→Audience, thread→Tone
   onLengthChange: (v: string) => void
   question: string
   onQuestionChange: (v: string) => void

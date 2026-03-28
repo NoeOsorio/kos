@@ -3,7 +3,7 @@ import { Plus, X } from 'lucide-react'
 
 interface KnowledgeSourcesProps {
   sourceIds: string[]
-  onToggle: (id: string) => void
+  onToggle: (id: string) => void  // TODO: called when a source chip is toggled once source items are rendered
 }
 
 export default function KnowledgeSources({ sourceIds, onToggle }: KnowledgeSourcesProps) {
