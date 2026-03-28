@@ -9,7 +9,8 @@ const mockAnalyser = {
   connect: vi.fn(),
 }
 const mockSource = { connect: vi.fn() }
-const mockStream = { getTracks: () => [{ stop: vi.fn() }] }
+const mockTrack = { stop: vi.fn() }
+const mockStream = { getTracks: () => [mockTrack] }
 const mockAudioContext = {
   createAnalyser: vi.fn(() => mockAnalyser),
   createMediaStreamSource: vi.fn(() => mockSource),
@@ -17,6 +18,7 @@ const mockAudioContext = {
 }
 
 beforeEach(() => {
+  mockTrack.stop.mockReset()
   vi.stubGlobal('AudioContext', vi.fn(() => mockAudioContext))
   Object.defineProperty(globalThis, 'navigator', {
     value: {
@@ -82,5 +84,14 @@ describe('useAudioAnalyser', () => {
     await act(async () => { success = await result.current.start() })
     expect(success).toBe(false)
     expect(result.current.isActive).toBe(false)
+  })
+
+  it('stops mic and closes context on unmount', async () => {
+    const { result, unmount } = renderHook(() => useAudioAnalyser())
+    await act(async () => { await result.current.start() })
+    unmount()
+    // After unmount, the stream tracks should have been stopped
+    const tracks = mockStream.getTracks()
+    expect(tracks[0].stop).toHaveBeenCalled()
   })
 })

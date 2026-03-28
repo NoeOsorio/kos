@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 
 interface UseAudioAnalyserReturn {
   isActive: boolean
@@ -44,6 +44,7 @@ export function useAudioAnalyser(): UseAudioAnalyserReturn {
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
     contextRef.current?.close()
     contextRef.current = null
     analyserRef.current = null
@@ -51,6 +52,12 @@ export function useAudioAnalyser(): UseAudioAnalyserReturn {
     activeRef.current = false
     setIsActive(false)
   }, [])
+
+  useEffect(() => {
+    return () => {
+      stop()
+    }
+  }, [stop])
 
   return { isActive, start, stop, getAmplitude }
 }
