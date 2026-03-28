@@ -86,15 +86,25 @@ describe('useTalkMachine', () => {
     expect(result.current.talkState).toBe('LISTENING')
   })
 
-  it('send is no-op when not LISTENING', () => {
+  it('transitions STANDBY → PROCESSING on send (text input path)', () => {
     const { result } = renderHook(() => useTalkMachine())
-    // From STANDBY
     act(() => result.current.send())
-    expect(result.current.talkState).toBe('STANDBY')
-    // From PROCESSING
+    expect(result.current.talkState).toBe('PROCESSING')
+  })
+
+  it('send is no-op when SPEAKING', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.send())              // → PROCESSING
+    act(() => result.current.firstTokenReceived()) // → SPEAKING
+    act(() => result.current.send())              // should be no-op
+    expect(result.current.talkState).toBe('SPEAKING')
+  })
+
+  it('send is no-op when PROCESSING', () => {
+    const { result } = renderHook(() => useTalkMachine())
     act(() => result.current.activateMic())
-    act(() => result.current.send())
-    act(() => result.current.send())
+    act(() => result.current.send())  // → PROCESSING
+    act(() => result.current.send())  // should be no-op
     expect(result.current.talkState).toBe('PROCESSING')
   })
 

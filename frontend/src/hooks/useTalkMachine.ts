@@ -25,11 +25,11 @@ export interface UseTalkMachineReturn {
   setTranscript: (text: string) => void
   /** Transition STANDBY → LISTENING. No-op from any other state. */
   activateMic: () => void
-  /** Transition LISTENING → PROCESSING. Caller is responsible for sending text to the API. No-op from any other state. */
+  /** Transition STANDBY | LISTENING → PROCESSING. Caller is responsible for sending text to the API. No-op from any other state. */
   send: () => void
   /** Transition PROCESSING → SPEAKING. No-op from any other state. */
   firstTokenReceived: () => void
-  /** Transition SPEAKING → STANDBY. No-op from any other state. */
+  /** Transition SPEAKING | PROCESSING → STANDBY. No-op from any other state. */
   streamComplete: () => void
   /** Transition SPEAKING → PROCESSING. No-op from any other state. */
   followUp: () => void
@@ -45,10 +45,10 @@ export function useTalkMachine(): UseTalkMachineReturn {
   }, [])
 
   const send = useCallback(() => {
+    setInputText('')
     setTalkState(s => {
-      if (s !== 'LISTENING') return s
-      setInputText('')
-      return 'PROCESSING'
+      if (s === 'STANDBY' || s === 'LISTENING') return 'PROCESSING'
+      return s
     })
   }, [])
 
@@ -57,7 +57,7 @@ export function useTalkMachine(): UseTalkMachineReturn {
   }, [])
 
   const streamComplete = useCallback(() => {
-    setTalkState(s => s === 'SPEAKING' ? 'STANDBY' : s)
+    setTalkState(s => (s === 'SPEAKING' || s === 'PROCESSING') ? 'STANDBY' : s)
   }, [])
 
   const followUp = useCallback(() => {

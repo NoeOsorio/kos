@@ -31,6 +31,7 @@ export default function TalkPage() {
     startListening, stopListening, clearTranscript,
   } = useSpeechRecognition()
 
+  const abortControllerRef = useRef<AbortController | null>(null)
   const freqBarsRef = useRef<FreqBarsHandle>(null)
   const particleRef  = useRef<ParticleNebulaHandle>(null)
   const waveRef      = useRef<WaveCanvasHandle>(null)
@@ -40,6 +41,13 @@ export default function TalkPage() {
   const lastTimeRef  = useRef(0)
   const visualParamsRef = useRef(visualParams)
   useEffect(() => { visualParamsRef.current = visualParams }, [visualParams])
+
+  // Cancel any in-flight request on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
 
   const vizSize = getVisualizerSize()
 
@@ -75,6 +83,9 @@ export default function TalkPage() {
 
   async function handleSend(text: string) {
     if (!text.trim()) return
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     send()
     clearTranscript()
     try {
@@ -82,13 +93,17 @@ export default function TalkPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
+        signal: controller.signal,
       })
       firstTokenReceived()
       const data = await res.json()
       setTranscript(data.response ?? '')
       streamComplete()
-    } catch {
-      streamComplete()
+    } catch (err) {
+      // Don't call streamComplete if the request was intentionally aborted
+      if (err instanceof Error && err.name !== 'AbortError') {
+        streamComplete()
+      }
     }
   }
 
