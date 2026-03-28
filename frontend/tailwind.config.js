@@ -7,6 +7,15 @@ export default {
         mono: ["'Fira Code'", "'SF Mono'", 'monospace'],
         sans: ['-apple-system', 'Inter', 'sans-serif'],
       },
+      keyframes: {
+        'slide-in-right': {
+          '0%': { transform: 'translateX(100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+      },
+      animation: {
+        'slide-in-right': 'slide-in-right 0.25s ease-out',
+      },
       colors: {
         'bg-deep':        '#05000e',
         'bg-tool':        '#0e0e12',
