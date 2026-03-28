@@ -25,3 +25,24 @@ async def list_insights():
 async def create_insight(insight: InsightCreate):
     # TODO: generate embedding + save to Supabase
     return {**insight.model_dump(), "id": "placeholder", "created_at": datetime.utcnow()}
+
+
+class TopicInsightCreate(BaseModel):
+    title: str
+    description: str
+
+
+class TopicInsightResponse(BaseModel):
+    id: str
+    title: str
+    description: str
+
+
+@router.post("/topic", response_model=TopicInsightResponse, status_code=201)
+async def save_topic_insight(insight: TopicInsightCreate) -> TopicInsightResponse:
+    # TODO: generate embedding + save to Supabase
+    return TopicInsightResponse(
+        id="placeholder-" + insight.title.lower().replace(" ", "-"),
+        title=insight.title,
+        description=insight.description,
+    )
