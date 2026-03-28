@@ -12,7 +12,11 @@ function load(): BuildSession[] {
 }
 
 function persist(sessions: BuildSession[]): void {
-  localStorage.setItem(KEY, JSON.stringify(sessions))
+  try {
+    localStorage.setItem(KEY, JSON.stringify(sessions))
+  } catch {
+    // localStorage may be unavailable (quota exceeded, private browsing)
+  }
 }
 
 export function useBuildSessions() {
