@@ -1,4 +1,4 @@
-import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react'
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react'
 
 const BANDS = [
   { count: 16, baseR: 8 },
@@ -49,10 +49,13 @@ export interface ParticleNebulaHandle {
 
 interface ParticleNebulaCanvasProps {
   size: number
+  onPointerDown?: React.PointerEventHandler<HTMLCanvasElement>
+  onPointerUp?: React.PointerEventHandler<HTMLCanvasElement>
+  onPointerCancel?: React.PointerEventHandler<HTMLCanvasElement>
 }
 
 const ParticleNebulaCanvas = forwardRef<ParticleNebulaHandle, ParticleNebulaCanvasProps>(
-  function ParticleNebulaCanvas({ size }, ref) {
+  function ParticleNebulaCanvas({ size, onPointerDown, onPointerUp, onPointerCancel }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const scale = size / 480
     const particlesRef = useRef<Particle[]>(createParticles(scale))
@@ -109,8 +112,11 @@ const ParticleNebulaCanvas = forwardRef<ParticleNebulaHandle, ParticleNebulaCanv
     return (
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 pointer-events-none"
-        style={{ zIndex: 4 }}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        className="absolute inset-0"
+        style={{ zIndex: 4, cursor: 'pointer', touchAction: 'none' }}
       />
     )
   }

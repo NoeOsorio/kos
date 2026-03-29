@@ -23,6 +23,11 @@ describe('TalkPage', () => {
     expect(screen.getByPlaceholderText(/ask/i)).toBeInTheDocument()
   })
 
+  it('renders the hold-to-talk hint', () => {
+    render(<Wrapper><TalkPage /></Wrapper>)
+    expect(screen.getByText(/hold to talk/i)).toBeInTheDocument()
+  })
+
   it('renders the mic button', () => {
     render(<Wrapper><TalkPage /></Wrapper>)
     expect(screen.getByRole('button', { name: /mic/i })).toBeInTheDocument()
