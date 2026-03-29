@@ -98,7 +98,12 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     )
 
     try:
-        raw = json.loads(message.content[0].text)
+        text = message.content[0].text.strip()
+        # Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1]
+            text = text.rsplit("```", 1)[0].strip()
+        raw = json.loads(text)
         new_topics = [TopicItem(**t) for t in raw.get("new_topics", [])]
         similar = _find_similar(raw.get("similar_keywords", []))
     except (json.JSONDecodeError, KeyError, TypeError, ValidationError):
