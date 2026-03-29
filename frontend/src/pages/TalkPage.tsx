@@ -226,12 +226,10 @@ export default function TalkPage() {
 
       <div className="z-10 w-full">
         <TalkInput
-          talkState={talkState}
           transcript={transcript}
           inputText={inputText}
           onInputChange={setInputText}
           onSend={handleSend}
-          onMicToggle={handleMicToggle}
         />
       </div>
     </div>

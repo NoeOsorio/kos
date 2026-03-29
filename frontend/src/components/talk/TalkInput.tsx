@@ -1,26 +1,19 @@
 import { KeyboardEvent } from 'react'
-import { Mic, Send } from 'lucide-react'
-import type { TalkState } from '../../hooks/useTalkMachine'
+import { Send } from 'lucide-react'
 
 interface TalkInputProps {
-  talkState: TalkState
   transcript: string
   inputText: string
   onInputChange: (text: string) => void
   onSend: (text: string) => void
-  onMicToggle: () => void
 }
 
 export default function TalkInput({
-  talkState,
   transcript,
   inputText,
   onInputChange,
   onSend,
-  onMicToggle,
 }: TalkInputProps) {
-  const isListening = talkState === 'LISTENING'
-
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && inputText.trim()) {
       onSend(inputText.trim())
@@ -60,21 +53,6 @@ export default function TalkInput({
             <Send size={14} color="#a78bfa" />
           </button>
         )}
-
-        <button
-          aria-label="mic toggle"
-          onClick={onMicToggle}
-          className={[
-            'w-[50px] h-[50px] rounded-full flex items-center justify-center shrink-0',
-            isListening ? 'animate-pulse' : '',
-          ].join(' ')}
-          style={{
-            background: isListening ? 'rgba(139,92,246,0.5)' : 'rgba(139,92,246,0.2)',
-            boxShadow: isListening ? '0 0 20px rgba(139,92,246,0.6)' : 'none',
-          }}
-        >
-          <Mic size={20} color={isListening ? '#c4b5fd' : '#8b5cf6'} />
-        </button>
       </div>
     </div>
   )

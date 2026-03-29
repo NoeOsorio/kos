@@ -1,14 +1,11 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import TalkInput from '../components/talk/TalkInput'
-import type { TalkState } from '../hooks/useTalkMachine'
 
 const defaultProps = {
-  talkState: 'STANDBY' as TalkState,
   transcript: '',
   inputText: '',
   onInputChange: vi.fn(),
   onSend: vi.fn(),
-  onMicToggle: vi.fn(),
 }
 
 describe('TalkInput', () => {
@@ -17,9 +14,9 @@ describe('TalkInput', () => {
     expect(screen.getByPlaceholderText(/ask/i)).toBeInTheDocument()
   })
 
-  it('renders mic button', () => {
+  it('does not render a mic button', () => {
     render(<TalkInput {...defaultProps} />)
-    expect(screen.getByRole('button', { name: /mic/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /mic/i })).not.toBeInTheDocument()
   })
 
   it('calls onInputChange when typing', () => {
@@ -50,21 +47,8 @@ describe('TalkInput', () => {
     expect(onSend).toHaveBeenCalledWith('hello')
   })
 
-  it('calls onMicToggle when mic button clicked', () => {
-    const onMicToggle = vi.fn()
-    render(<TalkInput {...defaultProps} onMicToggle={onMicToggle} />)
-    fireEvent.click(screen.getByRole('button', { name: /mic/i }))
-    expect(onMicToggle).toHaveBeenCalled()
-  })
-
   it('renders transcript text when provided', () => {
     render(<TalkInput {...defaultProps} transcript="Here is what KOS said." />)
     expect(screen.getByText('Here is what KOS said.')).toBeInTheDocument()
-  })
-
-  it('applies animate-pulse class on mic button when LISTENING', () => {
-    render(<TalkInput {...defaultProps} talkState="LISTENING" />)
-    const micBtn = screen.getByRole('button', { name: /mic/i })
-    expect(micBtn.className).toContain('animate-pulse')
   })
 })
