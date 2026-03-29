@@ -65,4 +65,27 @@ describe('TalkPage', () => {
       expect(screen.getByText('STANDBY')).toBeInTheDocument()
     })
   })
+
+  it('calls /api/analyze after a successful /api/talk response', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ response: 'Tell me more about your experience' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ new_topics: [], similar: [] }),
+      })
+    global.fetch = mockFetch
+
+    render(<Wrapper><TalkPage /></Wrapper>)
+    const input = screen.getByPlaceholderText(/ask/i)
+    fireEvent.change(input, { target: { value: 'I read about Stoicism' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      const calls = (mockFetch.mock.calls as [string][]).map(c => c[0])
+      expect(calls).toContain('/api/analyze')
+    })
+  })
 })

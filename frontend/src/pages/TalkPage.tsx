@@ -2,12 +2,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTalkMachine } from '../hooks/useTalkMachine'
 import { useAudioAnalyser } from '../hooks/useAudioAnalyser'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
+import { useKnowledgeCards } from '../hooks/useKnowledgeCards'
 import StarfieldCanvas from '../components/talk/StarfieldCanvas'
 import HUDRingsSVG from '../components/talk/HUDRingsSVG'
 import FreqBarsCanvas, { type FreqBarsHandle } from '../components/talk/FreqBarsCanvas'
 import ParticleNebulaCanvas, { type ParticleNebulaHandle } from '../components/talk/ParticleNebulaCanvas'
 import WaveCanvas, { type WaveCanvasHandle } from '../components/talk/WaveCanvas'
 import TalkInput from '../components/talk/TalkInput'
+import KnowledgeCards from '../components/talk/KnowledgeCards'
+import type { NewTopicCard } from '../hooks/useKnowledgeCards'
 
 function getVisualizerSize(): number {
   if (typeof window === 'undefined') return 480
@@ -30,6 +33,8 @@ export default function TalkPage() {
     isSupported: speechSupported, transcript: speechTranscript,
     startListening, stopListening, clearTranscript,
   } = useSpeechRecognition()
+
+  const { cards, addCards, dismiss, clearAll } = useKnowledgeCards()
 
   const [showRipple, setShowRipple] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -89,6 +94,7 @@ export default function TalkPage() {
     abortControllerRef.current = controller
     send()
     clearTranscript()
+    clearAll()
     try {
       const res = await fetch('/api/talk', {
         method: 'POST',
@@ -98,14 +104,33 @@ export default function TalkPage() {
       })
       firstTokenReceived()
       const data = await res.json()
-      setTranscript(data.response ?? '')
+      const responseText = data.response ?? ''
+      setTranscript(responseText)
       streamComplete()
+
+      // Fire-and-forget: analyze conversation for topics
+      fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, response: responseText }),
+      })
+        .then(r => r.json())
+        .then(d => addCards(d.new_topics ?? [], d.similar ?? []))
+        .catch(() => { /* non-critical */ })
     } catch (err) {
-      // Don't call streamComplete if the request was intentionally aborted
       if (err instanceof Error && err.name !== 'AbortError') {
         streamComplete()
       }
     }
+  }
+
+  async function handleSaveCard(card: NewTopicCard) {
+    dismiss(card.id)
+    fetch('/api/insights/topic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: card.name, description: card.description }),
+    }).catch(() => { /* non-critical */ })
   }
 
   async function handleNebulaPointerDown() {
@@ -208,6 +233,13 @@ export default function TalkPage() {
             />
           </div>
         )}
+
+        {/* Knowledge cards */}
+        <KnowledgeCards
+          cards={cards}
+          onDismiss={dismiss}
+          onSave={handleSaveCard}
+        />
       </div>
 
       {/* State label */}
