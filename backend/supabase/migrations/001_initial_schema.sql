@@ -1,3 +1,4 @@
+-- Run this in the Supabase SQL editor (or via: supabase db push)
 -- Enable pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
