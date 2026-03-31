@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Literal
+
+from app.core.supabase import get_supabase
 
 router = APIRouter()
 
@@ -20,12 +22,16 @@ class LogResponse(LogEntry):
 
 
 @router.get("")
-async def list_logs():
-    # TODO: connect to Supabase
-    return []
+async def list_logs() -> list[LogResponse]:
+    sb = get_supabase()
+    result = sb.table("logs").select("*").order("created_at", desc=True).execute()
+    return result.data or []
 
 
 @router.post("", response_model=LogResponse)
-async def create_log(entry: LogEntry):
-    # TODO: save to Supabase
-    return {**entry.model_dump(), "id": "placeholder", "created_at": datetime.utcnow()}
+async def create_log(entry: LogEntry) -> LogResponse:
+    sb = get_supabase()
+    result = sb.table("logs").insert(entry.model_dump(exclude_none=True)).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to create log")
+    return result.data[0]
