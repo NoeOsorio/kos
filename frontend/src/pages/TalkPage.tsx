@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useTalkMachine } from '../hooks/useTalkMachine'
+import { useVoiceInteraction } from '../hooks/useVoiceInteraction'
+import type { Message } from '../hooks/useVoiceInteraction'
 import { useAudioAnalyser } from '../hooks/useAudioAnalyser'
-import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { useKnowledgeCards } from '../hooks/useKnowledgeCards'
 import StarfieldCanvas from '../components/talk/StarfieldCanvas'
 import HUDRingsSVG from '../components/talk/HUDRingsSVG'
@@ -21,24 +21,132 @@ function getVisualizerSize(): number {
   return 480
 }
 
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 export default function TalkPage() {
-  const machine = useTalkMachine()
-  const {
-    talkState, visualParams, transcript, inputText,
-    setInputText, setTranscript, activateMic, send,
-    firstTokenReceived, streamComplete,
-  } = machine
-  const { isActive: micActive, start: startMic, stop: stopMic, getAmplitude } = useAudioAnalyser()
-  const {
-    isSupported: speechSupported, transcript: speechTranscript,
-    startListening, stopListening, clearTranscript,
-  } = useSpeechRecognition()
-
-  const { cards, addCards, dismiss, clearAll } = useKnowledgeCards()
-
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
-  const [showRipple, setShowRipple] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
+  const { cards, addCards, dismiss, clearAll } = useKnowledgeCards()
+  const voiceRef = useRef<ReturnType<typeof useVoiceInteraction> | null>(null)
+
+  // handleSend is defined first but uses voiceRef to avoid circular dependency
+  const handleSend = useCallback(async (text: string, windowed: Message[]) => {
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    clearAll()
+    setMessages(prev => [...prev, { role: 'user', content: text }])
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: windowed }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        voiceRef.current?.streamComplete()
+        return
+      }
+
+      // SSE streaming path
+      if (res.body) {
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let fullResponse = ''
+        let buffer = ''
+        let firstToken = true
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const parts = buffer.split('\n\n')
+          buffer = parts.pop() ?? ''
+          for (const part of parts) {
+            if (!part.startsWith('data: ')) continue
+            const token = part.slice(6)
+            if (token === '[DONE]') break
+            if (firstToken) { voiceRef.current?.firstTokenReceived(); firstToken = false }
+            fullResponse += token
+            voiceRef.current?.setTranscript(fullResponse)
+          }
+        }
+
+        voiceRef.current?.streamComplete()
+        setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }])
+
+        // Background: analyze and auto-save topics
+        fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, response: fullResponse }),
+        })
+          .then(r => r.json())
+          .then(d => {
+            addCards(d.new_topics ?? [], d.similar ?? [])
+            ;(d.new_topics ?? []).forEach((topic: { name: string; description: string }) => {
+              fetch('/api/insights/topic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: topic.name, description: topic.description }),
+              }).catch(() => {})
+            })
+          })
+          .catch(() => {})
+      } else {
+        // JSON fallback path (e.g. non-streaming responses)
+        const data = await res.json()
+        const responseText = data.response ?? ''
+        voiceRef.current?.firstTokenReceived()
+        voiceRef.current?.setTranscript(responseText)
+        voiceRef.current?.streamComplete()
+        setMessages(prev => [...prev, { role: 'assistant', content: responseText }])
+
+        fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, response: responseText }),
+        })
+          .then(r => r.json())
+          .then(d => {
+            addCards(d.new_topics ?? [], d.similar ?? [])
+            ;(d.new_topics ?? []).forEach((topic: { name: string; description: string }) => {
+              fetch('/api/insights/topic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: topic.name, description: topic.description }),
+              }).catch(() => {})
+            })
+          })
+          .catch(() => {})
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name !== 'AbortError') voiceRef.current?.streamComplete()
+    }
+  }, [clearAll, addCards])
+
+  const voice = useVoiceInteraction({
+    messages,
+    onSend: handleSend,
+    onInterrupt: () => abortControllerRef.current?.abort(),
+  })
+  // Keep voiceRef in sync so handleSend can call voice methods
+  voiceRef.current = voice
+
+  // Cancel in-flight request on unmount
+  useEffect(() => {
+    return () => { abortControllerRef.current?.abort() }
+  }, [])
+
+  const vizSize = getVisualizerSize()
+  const { getAmplitude } = useAudioAnalyser()
+
   const freqBarsRef = useRef<FreqBarsHandle>(null)
   const particleRef  = useRef<ParticleNebulaHandle>(null)
   const waveRef      = useRef<WaveCanvasHandle>(null)
@@ -46,22 +154,8 @@ export default function TalkPage() {
   const ampLerpRef   = useRef(0)
   const tRef         = useRef(0)
   const lastTimeRef  = useRef(0)
-  const visualParamsRef = useRef(visualParams)
-  useEffect(() => { visualParamsRef.current = visualParams }, [visualParams])
-
-  // Cancel any in-flight request on unmount
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort()
-    }
-  }, [])
-
-  const vizSize = getVisualizerSize()
-
-  // Sync speech transcript into text input
-  useEffect(() => {
-    if (speechTranscript) setInputText(speechTranscript)
-  }, [speechTranscript, setInputText])
+  const visualParamsRef = useRef(voice.visualParams)
+  useEffect(() => { visualParamsRef.current = voice.visualParams }, [voice.visualParams])
 
   // Single rAF loop
   const tick = useCallback((now: number) => {
@@ -88,114 +182,32 @@ export default function TalkPage() {
     return () => cancelAnimationFrame(rafRef.current)
   }, [tick])
 
-  async function handleSend(text: string) {
-    if (!text.trim()) return
-    abortControllerRef.current?.abort()
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    send()
-    clearTranscript()
-    clearAll()
+  const [showRipple, setShowRipple] = useState(false)
 
-    const newMessages = [...messages, { role: 'user' as const, content: text }]
-    setMessages(newMessages)
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
-        signal: controller.signal,
-      })
-
-      if (!res.ok || !res.body) {
-        streamComplete()
-        return
-      }
-
-      firstTokenReceived()
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let fullResponse = ''
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const parts = buffer.split('\n\n')
-        buffer = parts.pop() ?? ''
-        for (const part of parts) {
-          if (!part.startsWith('data: ')) continue
-          const token = part.slice(6)
-          if (token === '[DONE]') break
-          fullResponse += token
-          setTranscript(fullResponse)
-        }
-      }
-
-      streamComplete()
-      setMessages(prev => [...prev, { role: 'assistant' as const, content: fullResponse }])
-
-      // Analyze exchange and auto-save all detected topics
-      fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, response: fullResponse }),
-      })
-        .then(r => r.json())
-        .then(d => {
-          addCards(d.new_topics ?? [], d.similar ?? [])
-          ;(d.new_topics ?? []).forEach((topic: { name: string; description: string }) => {
-            fetch('/api/insights/topic', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title: topic.name, description: topic.description }),
-            }).catch(() => {})
-          })
-        })
-        .catch(() => {})
-    } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        streamComplete()
-      }
-    }
+  const handleNebulaPointerDown = () => {
+    setShowRipple(true)
+    setTimeout(() => setShowRipple(false), 400)
+    voice.onPointerDown()
   }
 
   function handleSaveCard(card: NewTopicCard) {
     dismiss(card.id)
+    fetch('/api/insights/topic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: card.name, description: card.description }),
+    }).catch(() => {})
   }
 
-  async function handleNebulaPointerDown() {
-    setShowRipple(true)
-    setTimeout(() => setShowRipple(false), 400)
-    const ok = await startMic()
-    if (ok) {
-      activateMic()
-      if (speechSupported) startListening()
-    }
-  }
+  // Derive status label and hint from voice state
+  const { talkState, mode, conversationTimeLeft } = voice
+  const isConversation = mode === 'conversation'
 
-  async function handleNebulaPointerUp() {
-    stopMic()
-    stopListening()
-    const text = (speechTranscript || inputText).trim()
-    if (text) await handleSend(text)
-  }
+  const statusLabel = talkState
 
-  async function handleMicToggle() {
-    if (micActive) {
-      stopMic()
-      stopListening()
-      if (inputText.trim()) await handleSend(inputText)
-    } else {
-      const ok = await startMic()
-      if (ok) {
-        activateMic()
-        if (speechSupported) startListening()
-      }
-    }
-  }
+  const hintText = isConversation
+    ? (talkState === 'SPEAKING' ? 'Tap to interrupt · Tap to end' : 'Tap to end')
+    : 'Hold to talk · Double-tap for conversation'
 
   return (
     <div className="relative flex flex-col items-center justify-center h-full overflow-hidden">
@@ -211,11 +223,11 @@ export default function TalkPage() {
           ref={particleRef}
           size={vizSize}
           onPointerDown={handleNebulaPointerDown}
-          onPointerUp={handleNebulaPointerUp}
-          onPointerCancel={handleNebulaPointerUp}
+          onPointerUp={voice.onPointerUp}
+          onPointerCancel={voice.onPointerCancel}
         />
         <FreqBarsCanvas ref={freqBarsRef} size={vizSize} />
-        <HUDRingsSVG ringSpeed={visualParams.ringSpeed} size={vizSize} />
+        <HUDRingsSVG ringSpeed={voice.visualParams.ringSpeed} size={vizSize} />
 
         {/* REC indicator — visible only during LISTENING */}
         {talkState === 'LISTENING' && (
@@ -280,21 +292,32 @@ export default function TalkPage() {
         className="font-mono text-[10px] tracking-[3px] uppercase mt-3 z-10"
         style={{ color: 'rgba(196,181,253,0.5)' }}
       >
-        {talkState}
+        {statusLabel}
       </p>
+
+      {/* Conversation timer */}
+      {isConversation && conversationTimeLeft > 0 && (
+        <p
+          className="font-mono text-[10px] tracking-[2px] z-10"
+          style={{ color: 'rgba(139,92,246,0.6)' }}
+        >
+          {formatTime(conversationTimeLeft)}
+        </p>
+      )}
+
       <p
         className="font-mono text-[9px] tracking-[2px] uppercase mb-6 z-10"
         style={{ color: 'rgba(196,181,253,0.2)' }}
       >
-        Hold to talk · Release to send
+        {hintText}
       </p>
 
       <div className="z-10 w-full">
         <TalkInput
-          transcript={transcript}
-          inputText={inputText}
-          onInputChange={setInputText}
-          onSend={handleSend}
+          transcript={voice.transcript}
+          inputText={voice.inputText}
+          onInputChange={voice.setInputText}
+          onSend={(text) => voice.sendText(text)}
         />
       </div>
     </div>
