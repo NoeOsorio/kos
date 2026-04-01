@@ -33,11 +33,14 @@ describe('TalkPage', () => {
     expect(screen.getByText('STANDBY')).toBeInTheDocument()
   })
 
-  it('sends POST /api/talk on Enter', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ response: 'Hello from KOS' }),
+  it('sends POST /api/chat on Enter', async () => {
+    const stream = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode('data: Hello\n\ndata: [DONE]\n\n'))
+        c.close()
+      },
     })
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, body: stream })
     global.fetch = mockFetch
 
     render(<Wrapper><TalkPage /></Wrapper>)
@@ -47,7 +50,7 @@ describe('TalkPage', () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/talk',
+        '/api/chat',
         expect.objectContaining({ method: 'POST' })
       )
     })
@@ -66,12 +69,15 @@ describe('TalkPage', () => {
     })
   })
 
-  it('calls /api/analyze after a successful /api/talk response', async () => {
+  it('calls /api/analyze after a successful /api/chat response', async () => {
+    const stream = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode('data: Tell me more\n\ndata: [DONE]\n\n'))
+        c.close()
+      },
+    })
     const mockFetch = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ response: 'Tell me more about your experience' }),
-      })
+      .mockResolvedValueOnce({ ok: true, body: stream })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ new_topics: [], similar: [] }),
