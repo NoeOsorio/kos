@@ -60,6 +60,7 @@ export function useVoiceInteraction({
   useEffect(() => { onSendRef.current = onSend }, [onSend])
   const onInterruptRef = useRef(onInterrupt)
   useEffect(() => { onInterruptRef.current = onInterrupt }, [onInterrupt])
+  const doExitConversationRef = useRef<() => void>(() => {})
   const modeRef = useRef(machine.mode)
   useEffect(() => { modeRef.current = machine.mode }, [machine.mode])
   const talkStateRef = useRef(machine.talkState)
@@ -86,7 +87,7 @@ export function useVoiceInteraction({
   // Sync speech transcript → machine inputText
   useEffect(() => {
     if (speechTranscript) machine.setInputText(speechTranscript)
-  }, [speechTranscript]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [speechTranscript, machine.setInputText])
 
   // Core send: stop mic/speech, slice history window, dispatch
   const doSend = useCallback((text: string) => {
@@ -115,6 +116,7 @@ export function useVoiceInteraction({
     stopListening()
     machine.exitConversation()
   }, [machine, stopMic, stopListening, stopConvoTimers])
+  useEffect(() => { doExitConversationRef.current = doExitConversation }, [doExitConversation])
 
   const doEnterConversation = useCallback(async () => {
     machine.enterConversation()
@@ -126,9 +128,9 @@ export function useVoiceInteraction({
     convoCountdownRef.current = setInterval(() => {
       remaining -= 1
       setConversationTimeLeft(remaining)
-      if (remaining <= 0) doExitConversation()
+      if (remaining <= 0) doExitConversationRef.current()
     }, 1000)
-    convoCapRef.current = setTimeout(doExitConversation, CONVO_MAX_MS)
+    convoCapRef.current = setTimeout(() => doExitConversationRef.current(), CONVO_MAX_MS)
   }, [machine, startMic, startListening, doExitConversation])
 
   // Auto-restart mic after AI finishes speaking in conversation (SPEAKING → LISTENING)
@@ -244,12 +246,14 @@ export function useVoiceInteraction({
     return () => {
       stopMic()
       stopListening()
-      stopConvoTimers()
+      if (convoCapRef.current) { clearTimeout(convoCapRef.current); convoCapRef.current = null }
+      if (convoCountdownRef.current) { clearInterval(convoCountdownRef.current); convoCountdownRef.current = null }
+      setConversationTimeLeft(0)
       if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current)
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
       if (doubleTapTimerRef.current) clearTimeout(doubleTapTimerRef.current)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stopMic, stopListening])
 
   return {
     talkState: machine.talkState,
