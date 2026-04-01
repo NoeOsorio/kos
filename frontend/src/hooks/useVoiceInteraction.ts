@@ -233,9 +233,9 @@ export function useVoiceInteraction({
       isHoldingRef.current = false
       stopMic()
       stopListening()
-      machine.exitConversation()
+      doExitConversationRef.current()
     }
-  }, [machine, stopMic, stopListening])
+  }, [stopMic, stopListening])
 
   const sendText = useCallback((text: string) => {
     doSend(text)
