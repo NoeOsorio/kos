@@ -36,6 +36,7 @@ export default function TalkPage() {
 
   const { cards, addCards, dismiss, clearAll } = useKnowledgeCards()
 
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
   const [showRipple, setShowRipple] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const freqBarsRef = useRef<FreqBarsHandle>(null)
@@ -95,28 +96,65 @@ export default function TalkPage() {
     send()
     clearTranscript()
     clearAll()
+
+    const newMessages = [...messages, { role: 'user' as const, content: text }]
+    setMessages(newMessages)
+
     try {
-      const res = await fetch('/api/talk', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ messages: newMessages }),
         signal: controller.signal,
       })
-      firstTokenReceived()
-      const data = await res.json()
-      const responseText = data.response ?? ''
-      setTranscript(responseText)
-      streamComplete()
 
-      // Fire-and-forget: analyze conversation for topics
+      if (!res.ok || !res.body) {
+        streamComplete()
+        return
+      }
+
+      firstTokenReceived()
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let fullResponse = ''
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue
+          const token = part.slice(6)
+          if (token === '[DONE]') break
+          fullResponse += token
+          setTranscript(fullResponse)
+        }
+      }
+
+      streamComplete()
+      setMessages(prev => [...prev, { role: 'assistant' as const, content: fullResponse }])
+
+      // Analyze exchange and auto-save all detected topics
       fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, response: responseText }),
+        body: JSON.stringify({ message: text, response: fullResponse }),
       })
         .then(r => r.json())
-        .then(d => addCards(d.new_topics ?? [], d.similar ?? []))
-        .catch(() => { /* non-critical */ })
+        .then(d => {
+          addCards(d.new_topics ?? [], d.similar ?? [])
+          ;(d.new_topics ?? []).forEach((topic: { name: string; description: string }) => {
+            fetch('/api/insights/topic', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: topic.name, description: topic.description }),
+            }).catch(() => {})
+          })
+        })
+        .catch(() => {})
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
         streamComplete()
@@ -124,13 +162,8 @@ export default function TalkPage() {
     }
   }
 
-  async function handleSaveCard(card: NewTopicCard) {
+  function handleSaveCard(card: NewTopicCard) {
     dismiss(card.id)
-    fetch('/api/insights/topic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: card.name, description: card.description }),
-    }).catch(() => { /* non-critical */ })
   }
 
   async function handleNebulaPointerDown() {

@@ -1,4 +1,5 @@
 import json
+from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, ValidationError
 import anthropic
@@ -19,23 +20,31 @@ _KNOWLEDGE_BASE = [
     {"id": "node-zk", "title": "Zettelkasten", "excerpt": "Notes connected by idea relationships rather than folders form an emergent knowledge graph."},
 ]
 
-_EXTRACTION_PROMPT = """Extract the main knowledge topics from this conversation exchange.
+_EXTRACTION_PROMPT = """Extract the main knowledge topics from this conversation exchange and classify the content type.
 
 User message: {message}
 AI response: {response}
 
 Return a JSON object with this exact shape:
 {{
+  "type": "idea",
   "new_topics": [
     {{"name": "Topic Name", "description": "One sentence description"}}
   ],
   "similar_keywords": ["keyword1", "keyword2"]
 }}
 
-Rules:
-- Only include concrete knowledge topics (concepts, frameworks, philosophies, skills). Skip small talk.
-- Maximum 2 new_topics. If no clear topic exists, return empty list.
-- similar_keywords: 2-4 single words useful for matching existing knowledge. Empty list if no topics.
+Rules for "type" — pick ONE:
+- "book": user explicitly mentions a book or author
+- "class": user mentions a class, course, lecture, or university subject
+- "article": user mentions an article, paper, or blog post
+- "connection": user describes a relationship between two concepts
+- "idea": everything else (default)
+
+Rules for topics:
+- Only concrete knowledge topics (concepts, frameworks, skills). Skip small talk.
+- Maximum 2 new_topics. Empty list if no clear topic.
+- similar_keywords: 2-4 single words for matching existing knowledge. Empty list if none.
 - Return only valid JSON, nothing else."""
 
 
@@ -56,6 +65,7 @@ class SimilarItem(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
+    type: Literal["book", "idea", "class", "connection", "article"] = "idea"
     new_topics: list[TopicItem]
     similar: list[SimilarItem]
 
@@ -79,11 +89,11 @@ def _find_similar(keywords: list[str]) -> list[SimilarItem]:
 async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     # Skip trivially short exchanges
     if len(request.message.strip()) < 10:
-        return AnalyzeResponse(new_topics=[], similar=[])
+        return AnalyzeResponse(type="idea", new_topics=[], similar=[])
 
     # Skip AI extraction if no API key is configured
     if not settings.anthropic_api_key:
-        return AnalyzeResponse(new_topics=[], similar=[])
+        return AnalyzeResponse(type="idea", new_topics=[], similar=[])
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     prompt = _EXTRACTION_PROMPT.format(
@@ -98,10 +108,18 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     )
 
     try:
-        raw = json.loads(message.content[0].text)
+        text = message.content[0].text.strip()
+        # Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1]
+            text = text.rsplit("```", 1)[0].strip()
+        raw = json.loads(text)
+        intent_type = raw.get("type", "idea")
+        if intent_type not in ("book", "idea", "class", "connection", "article"):
+            intent_type = "idea"
         new_topics = [TopicItem(**t) for t in raw.get("new_topics", [])]
         similar = _find_similar(raw.get("similar_keywords", []))
     except (json.JSONDecodeError, KeyError, TypeError, ValidationError):
-        return AnalyzeResponse(new_topics=[], similar=[])
+        return AnalyzeResponse(type="idea", new_topics=[], similar=[])
 
-    return AnalyzeResponse(new_topics=new_topics, similar=similar)
+    return AnalyzeResponse(type=intent_type, new_topics=new_topics, similar=similar)

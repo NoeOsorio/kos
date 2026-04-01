@@ -2,6 +2,7 @@ export interface KOSNode {
   id: string
   label: string
   cluster: number
+  area: string | null
   connections: string[]
   insight: string
   date: string
@@ -24,6 +25,7 @@ export interface RawNode {
   id: string
   label: string
   cluster: number
+  area: string | null
   connections: string[]
   insight: string
   date: string
