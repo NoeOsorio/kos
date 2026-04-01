@@ -47,3 +47,8 @@ logs/
 htmlcov/
 .coverage
 .worktrees/
+
+.venv/
+.node-compile-cache/
+.node-compile-cache/*
+node-compile-cache/
