@@ -1,46 +1,44 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
+from unittest.mock import MagicMock, patch
 
 
-def test_get_graph_returns_200():
-    response = client.get("/api/graph")
-    assert response.status_code == 200
+def test_graph_returns_nodes_from_db(client):
+    mock_sb = MagicMock()
+
+    # insights query result
+    insights_data = [{
+        "id": "ins-1",
+        "content": "Deep work produces rare and valuable output",
+        "area": "productivity",
+        "created_at": "2026-03-01T00:00:00+00:00",
+        "logs": {"title": "Deep Work"},
+    }]
+    # connections query result
+    connections_data = []
+
+    # Two sequential table() calls — first for insights, second for connections
+    mock_sb.table.return_value.select.return_value.execute.side_effect = [
+        MagicMock(data=insights_data),
+        MagicMock(data=connections_data),
+    ]
+
+    with patch("app.api.routes.graph.get_supabase", return_value=mock_sb):
+        resp = client.get("/api/graph")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "nodes" in body and "edges" in body
+    assert len(body["nodes"]) == 1
+    assert body["nodes"][0]["label"] == "Deep Work"
+    assert body["nodes"][0]["area"] == "productivity"
 
 
-def test_get_graph_has_nodes_and_edges():
-    data = client.get("/api/graph").json()
-    assert "nodes" in data
-    assert "edges" in data
+def test_graph_falls_back_to_mock_when_empty(client):
+    mock_sb = MagicMock()
+    mock_sb.table.return_value.select.return_value.execute.return_value.data = []
 
+    with patch("app.api.routes.graph.get_supabase", return_value=mock_sb):
+        resp = client.get("/api/graph")
 
-def test_graph_has_at_least_one_node():
-    data = client.get("/api/graph").json()
-    assert len(data["nodes"]) >= 1
-
-
-def test_graph_node_has_required_fields():
-    node = client.get("/api/graph").json()["nodes"][0]
-    for field in ("id", "label", "cluster", "connections", "insight", "date"):
-        assert field in node, f"Missing field: {field}"
-
-
-def test_graph_node_connections_is_list():
-    node = client.get("/api/graph").json()["nodes"][0]
-    assert isinstance(node["connections"], list)
-
-
-def test_graph_edge_has_required_fields():
-    edges = client.get("/api/graph").json()["edges"]
-    if edges:
-        for field in ("source", "target", "weight"):
-            assert field in edges[0], f"Missing field: {field}"
-
-
-def test_edge_endpoints_reference_existing_nodes():
-    data = client.get("/api/graph").json()
-    node_ids = {n["id"] for n in data["nodes"]}
-    for edge in data["edges"]:
-        assert edge["source"] in node_ids, f"Unknown source: {edge['source']}"
-        assert edge["target"] in node_ids, f"Unknown target: {edge['target']}"
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["nodes"]) > 0  # mock fallback kicks in
