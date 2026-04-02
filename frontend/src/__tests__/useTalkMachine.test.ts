@@ -118,4 +118,81 @@ describe('useTalkMachine', () => {
     act(() => result.current.streamComplete())
     expect(result.current.talkState).toBe('LISTENING')
   })
+
+  // --- mode tests ---
+  it('initializes with mode idle', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    expect(result.current.mode).toBe('idle')
+  })
+
+  it('enterWalkie: STANDBY → LISTENING, mode=walkie', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.enterWalkie())
+    expect(result.current.talkState).toBe('LISTENING')
+    expect(result.current.mode).toBe('walkie')
+  })
+
+  it('enterConversation: STANDBY → LISTENING, mode=conversation', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.enterConversation())
+    expect(result.current.talkState).toBe('LISTENING')
+    expect(result.current.mode).toBe('conversation')
+  })
+
+  it('exitConversation: any state → STANDBY, mode=idle', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.enterConversation())
+    act(() => result.current.send())
+    act(() => result.current.exitConversation())
+    expect(result.current.talkState).toBe('STANDBY')
+    expect(result.current.mode).toBe('idle')
+  })
+
+  it('interruptConversation: SPEAKING → LISTENING, mode stays conversation', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.enterConversation())
+    act(() => result.current.send())
+    act(() => result.current.firstTokenReceived())
+    expect(result.current.talkState).toBe('SPEAKING')
+    act(() => result.current.interruptConversation())
+    expect(result.current.talkState).toBe('LISTENING')
+    expect(result.current.mode).toBe('conversation')
+  })
+
+  it('interruptConversation is no-op when not SPEAKING', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.enterConversation())
+    expect(result.current.talkState).toBe('LISTENING')
+    act(() => result.current.interruptConversation())
+    expect(result.current.talkState).toBe('LISTENING')
+  })
+
+  it('streamComplete in conversation mode: SPEAKING → LISTENING, mode stays conversation', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.enterConversation())
+    act(() => result.current.send())
+    act(() => result.current.firstTokenReceived())
+    act(() => result.current.streamComplete())
+    expect(result.current.talkState).toBe('LISTENING')
+    expect(result.current.mode).toBe('conversation')
+  })
+
+  it('streamComplete in walkie mode: SPEAKING → STANDBY, mode=idle', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.enterWalkie())
+    act(() => result.current.send())
+    act(() => result.current.firstTokenReceived())
+    act(() => result.current.streamComplete())
+    expect(result.current.talkState).toBe('STANDBY')
+    expect(result.current.mode).toBe('idle')
+  })
+
+  it('streamComplete in idle mode: SPEAKING → STANDBY, mode stays idle', () => {
+    const { result } = renderHook(() => useTalkMachine())
+    act(() => result.current.send())
+    act(() => result.current.firstTokenReceived())
+    act(() => result.current.streamComplete())
+    expect(result.current.talkState).toBe('STANDBY')
+    expect(result.current.mode).toBe('idle')
+  })
 })
