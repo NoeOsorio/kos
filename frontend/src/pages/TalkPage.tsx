@@ -327,8 +327,8 @@ export default function TalkPage() {
         </div>
       )}
 
-      {/* Mobile drawer — always rendered when content exists (handles its own visibility) */}
-      {isMobile && (
+      {/* Mobile drawer — only rendered when there is content */}
+      {isMobile && (cards.length > 0 || savedCards.length > 0) && (
         <KnowledgeCards
           cards={cards}
           savedCards={savedCards}
