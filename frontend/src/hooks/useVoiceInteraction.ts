@@ -221,11 +221,19 @@ export function useVoiceInteraction({
     const elapsed = Date.now() - pressStartRef.current
     if (isHoldingRef.current) {
       isHoldingRef.current = false
-      doSend(inputTextRef.current)
+      const text = inputTextRef.current
+      if (text.trim()) {
+        doSend(text)
+      } else {
+        // Released with nothing captured — cancel walkie, return to STANDBY
+        stopMic()
+        stopListening()
+        machine.exitConversation()
+      }
     } else if (elapsed < HOLD_MS) {
       handleTap()
     }
-  }, [doSend, handleTap])
+  }, [doSend, handleTap, stopMic, stopListening, machine])
 
   const onPointerCancel = useCallback(() => {
     if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null }
