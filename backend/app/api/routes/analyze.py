@@ -19,32 +19,30 @@ _KNOWLEDGE_BASE = [
     {"id": "node-zk", "title": "Zettelkasten", "excerpt": "Notes connected by idea relationships rather than folders form an emergent knowledge graph."},
 ]
 
-_EXTRACTION_PROMPT = """Extract the main knowledge topics from this conversation exchange and classify the content type.
+_EXTRACTION_PROMPT = """You are a knowledge extraction engine for a personal second brain app.
 
 User message: {message}
 AI response: {response}
 
-Return a JSON object with this exact shape:
+Extract up to 2 knowledge topics that the user personally encountered, visited, experienced, connected, or found meaningful. Skip generic Q&A, greetings, and exchanges with no personal knowledge content.
+
+For each topic:
+- Write a synthesis (2-3 sentences) grounded in what the user actually said or experienced — not a textbook definition. Use second-person ("You visited...", "You connected...", "You noticed...").
+- Generate a topic_key: a lowercase hyphenated slug of the core concept (e.g. "american-museum-natural-history", "flow-state", "stoicism").
+
+Return JSON only:
 {{
-  "type": "idea",
   "new_topics": [
-    {{"name": "Topic Name", "description": "One sentence description"}}
+    {{
+      "topic_key": "slug-of-concept",
+      "name": "Concept Name",
+      "synthesis": "2-3 sentence synthesis grounded in the user's actual words and experience."
+    }}
   ],
   "similar_keywords": ["keyword1", "keyword2"]
 }}
 
-Rules for "type" — pick ONE:
-- "book": user explicitly mentions a book or author
-- "class": user mentions a class, course, lecture, or university subject
-- "article": user mentions an article, paper, or blog post
-- "connection": user describes a relationship between two concepts
-- "idea": everything else (default)
-
-Rules for topics:
-- Only concrete knowledge topics (concepts, frameworks, skills). Skip small talk.
-- Maximum 2 new_topics. Empty list if no clear topic.
-- similar_keywords: 2-4 single words for matching existing knowledge. Empty list if none.
-- Return only valid JSON, nothing else."""
+Return empty new_topics list if there is no personal knowledge to extract. Return only valid JSON, nothing else."""
 
 
 class AnalyzeRequest(BaseModel):
