@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 
 export interface NewTopicCard {
   id: string
   type: 'new'
+  topicKey: string
   name: string
-  description: string
+  synthesis: string
 }
 
 export interface SimilarCard {
@@ -17,71 +18,66 @@ export interface SimilarCard {
 
 export type KnowledgeCard = NewTopicCard | SimilarCard
 
-interface TopicItem { name: string; description: string }
+interface TopicItem { topicKey: string; name: string; synthesis: string }
 interface SimilarItem { id: string; title: string; excerpt: string }
 
 const MAX_CARDS = 3
-const AUTO_DISMISS_MS = 8000
 
 export function useKnowledgeCards() {
   const [cards, setCards] = useState<KnowledgeCard[]>([])
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [savedCards, setSavedCards] = useState<NewTopicCard[]>([])
 
   const dismiss = useCallback((id: string) => {
-    const timer = timersRef.current.get(id)
-    if (timer) { clearTimeout(timer); timersRef.current.delete(id) }
     setCards(prev => prev.filter(c => c.id !== id))
   }, [])
 
-  const scheduleAutoDismiss = useCallback((id: string) => {
-    const timer = setTimeout(() => dismiss(id), AUTO_DISMISS_MS)
-    timersRef.current.set(id, timer)
-  }, [dismiss])
+  const save = useCallback((card: NewTopicCard) => {
+    setCards(prev => prev.filter(c => c.id !== card.id))
+    setSavedCards(prev => [...prev, card])
+  }, [])
 
   const addCards = useCallback((
     newTopics: TopicItem[],
     similar: SimilarItem[],
   ) => {
-    const incoming: KnowledgeCard[] = [
-      ...newTopics.map((t): NewTopicCard => ({
-        id: `new-${t.name}-${Date.now()}`,
-        type: 'new',
-        name: t.name,
-        description: t.description,
-      })),
-      ...similar.map((s): SimilarCard => ({
-        id: `similar-${s.id}-${Date.now()}`,
-        type: 'similar',
-        insightId: s.id,
-        title: s.title,
-        excerpt: s.excerpt,
-      })),
-    ]
-
-    if (incoming.length === 0) return
+    const incomingSimilar: SimilarCard[] = similar.map(s => ({
+      id: `similar-${s.id}-${Date.now()}`,
+      type: 'similar',
+      insightId: s.id,
+      title: s.title,
+      excerpt: s.excerpt,
+    }))
 
     setCards(prev => {
-      const combined = [...prev, ...incoming]
-      const capped = combined.slice(-MAX_CARDS)
-      // Cancel timers for dropped cards
-      const keptIds = new Set(capped.map(c => c.id))
-      combined.forEach(c => {
-        if (!keptIds.has(c.id)) {
-          const t = timersRef.current.get(c.id)
-          if (t) { clearTimeout(t); timersRef.current.delete(c.id) }
-        }
-      })
-      return capped
-    })
+      let updated = [...prev]
 
-    incoming.slice(-MAX_CARDS).forEach(c => scheduleAutoDismiss(c.id))
-  }, [scheduleAutoDismiss])
+      // Hydrate or add new topic cards
+      for (const t of newTopics) {
+        const existingIdx = updated.findIndex(c => c.type === 'new' && (c as NewTopicCard).topicKey === t.topicKey)
+        if (existingIdx >= 0) {
+          updated[existingIdx] = { ...updated[existingIdx], synthesis: t.synthesis } as NewTopicCard
+        } else {
+          updated.push({
+            id: `new-${t.topicKey}-${Date.now()}`,
+            type: 'new',
+            topicKey: t.topicKey,
+            name: t.name,
+            synthesis: t.synthesis,
+          })
+        }
+      }
+
+      // Add similar cards
+      updated = [...updated, ...incomingSimilar]
+
+      // Cap at MAX_CARDS (keep newest)
+      return updated.slice(-MAX_CARDS)
+    })
+  }, [])
 
   const clearAll = useCallback(() => {
-    timersRef.current.forEach(t => clearTimeout(t))
-    timersRef.current.clear()
     setCards([])
   }, [])
 
-  return { cards, addCards, dismiss, clearAll }
+  return { cards, savedCards, addCards, dismiss, save, clearAll }
 }
