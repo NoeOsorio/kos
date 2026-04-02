@@ -84,9 +84,11 @@ export function useVoiceInteraction({
   const silenceAccRef = useRef(0)
   const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Sync speech transcript → machine inputText
+  // Sync speech transcript → machine inputText (only while actively listening)
   useEffect(() => {
-    if (speechTranscript) machine.setInputText(speechTranscript)
+    if (speechTranscript && talkStateRef.current === 'LISTENING') {
+      machine.setInputText(speechTranscript)
+    }
   }, [speechTranscript, machine.setInputText])
 
   // Core send: stop mic/speech, slice history window, dispatch

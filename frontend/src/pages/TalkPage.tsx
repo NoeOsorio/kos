@@ -316,6 +316,7 @@ export default function TalkPage() {
         <TalkInput
           transcript={voice.transcript}
           inputText={voice.inputText}
+          messages={messages}
           onInputChange={voice.setInputText}
           onSend={(text) => voice.sendText(text)}
         />
