@@ -30,7 +30,7 @@ function formatTime(seconds: number): string {
 export default function TalkPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
-  const { cards, addCards, dismiss, clearAll } = useKnowledgeCards()
+  const { cards, addCards, dismiss, save, clearAll, savedCards } = useKnowledgeCards()
   const voiceRef = useRef<ReturnType<typeof useVoiceInteraction> | null>(null)
 
   // handleSend is defined first but uses voiceRef to avoid circular dependency
@@ -81,7 +81,7 @@ export default function TalkPage() {
         voiceRef.current?.streamComplete()
         setMessages(prev => [...prev, { role: 'assistant', content: fullResponse }])
 
-        // Background: analyze and auto-save topics
+        // Background: analyze topics (no auto-save)
         fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -90,13 +90,6 @@ export default function TalkPage() {
           .then(r => r.json())
           .then(d => {
             addCards(d.new_topics ?? [], d.similar ?? [])
-            ;(d.new_topics ?? []).forEach((topic: { name: string; description: string }) => {
-              fetch('/api/insights/topic', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: topic.name, description: topic.description }),
-              }).catch(() => {})
-            })
           })
           .catch(() => {})
       } else {
@@ -116,20 +109,13 @@ export default function TalkPage() {
           .then(r => r.json())
           .then(d => {
             addCards(d.new_topics ?? [], d.similar ?? [])
-            ;(d.new_topics ?? []).forEach((topic: { name: string; description: string }) => {
-              fetch('/api/insights/topic', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: topic.name, description: topic.description }),
-              }).catch(() => {})
-            })
           })
           .catch(() => {})
       }
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') voiceRef.current?.streamComplete()
     }
-  }, [clearAll, addCards])
+  }, [clearAll, addCards, save])
 
   const voice = useVoiceInteraction({
     messages,
@@ -191,11 +177,11 @@ export default function TalkPage() {
   }
 
   function handleSaveCard(card: NewTopicCard) {
-    dismiss(card.id)
+    save(card)
     fetch('/api/insights/topic', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: card.name, description: card.description }),
+      body: JSON.stringify({ title: card.name, description: card.synthesis }),
     }).catch(() => {})
   }
 
