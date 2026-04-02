@@ -93,8 +93,16 @@ export function useTalkMachine(): UseTalkMachineReturn {
 
   const activateMic        = useCallback(() => dispatch({ type: 'ACTIVATE_MIC' }), [])
   const enterWalkie        = useCallback(() => dispatch({ type: 'ENTER_WALKIE' }), [])
-  const enterConversation  = useCallback(() => dispatch({ type: 'ENTER_CONVERSATION' }), [])
-  const exitConversation   = useCallback(() => dispatch({ type: 'EXIT_CONVERSATION' }), [])
+  const enterConversation  = useCallback(() => {
+    setTranscript('')
+    setInputText('')
+    dispatch({ type: 'ENTER_CONVERSATION' })
+  }, [])
+  const exitConversation   = useCallback(() => {
+    setTranscript('')
+    setInputText('')
+    dispatch({ type: 'EXIT_CONVERSATION' })
+  }, [])
   const interruptConversation = useCallback(() => dispatch({ type: 'INTERRUPT_CONVERSATION' }), [])
   const firstTokenReceived = useCallback(() => dispatch({ type: 'FIRST_TOKEN' }), [])
   const streamComplete     = useCallback(() => dispatch({ type: 'STREAM_COMPLETE' }), [])
@@ -102,6 +110,7 @@ export function useTalkMachine(): UseTalkMachineReturn {
 
   const send = useCallback(() => {
     setInputText('')
+    setTranscript('')
     dispatch({ type: 'SEND' })
   }, [])
 

@@ -180,12 +180,19 @@ export function useVoiceInteraction({
       if (talkStateRef.current === 'SPEAKING') {
         onInterruptRef.current?.()
         machine.interruptConversation()
+      } else if (talkStateRef.current === 'LISTENING') {
+        const text = inputTextRef.current.trim()
+        if (text) {
+          doSend(text)
+        } else {
+          doExitConversation()
+        }
       } else {
         doExitConversation()
       }
     }
     // No-op from STANDBY idle — double-tap is needed to start conversation
-  }, [machine, doExitConversation])
+  }, [machine, doExitConversation, doSend])
 
   const handleDoubleTap = useCallback(async () => {
     if (talkStateRef.current === 'STANDBY') {

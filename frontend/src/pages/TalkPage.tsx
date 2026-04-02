@@ -312,7 +312,7 @@ export default function TalkPage() {
         {hintText}
       </p>
 
-      <div className="z-10 w-full">
+      <div className="z-10 w-full flex flex-col items-center">
         <TalkInput
           transcript={voice.transcript}
           inputText={voice.inputText}
