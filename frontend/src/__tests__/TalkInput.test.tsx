@@ -4,6 +4,7 @@ import TalkInput from '../components/talk/TalkInput'
 const defaultProps = {
   transcript: '',
   inputText: '',
+  messages: [],
   onInputChange: vi.fn(),
   onSend: vi.fn(),
 }
