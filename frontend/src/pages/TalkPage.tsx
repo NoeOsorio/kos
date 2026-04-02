@@ -3,6 +3,7 @@ import { useVoiceInteraction } from '../hooks/useVoiceInteraction'
 import type { Message } from '../hooks/useVoiceInteraction'
 import { useAudioAnalyser } from '../hooks/useAudioAnalyser'
 import { useKnowledgeCards } from '../hooks/useKnowledgeCards'
+import { useIsMobile } from '../hooks/useIsMobile'
 import StarfieldCanvas from '../components/talk/StarfieldCanvas'
 import HUDRingsSVG from '../components/talk/HUDRingsSVG'
 import FreqBarsCanvas, { type FreqBarsHandle } from '../components/talk/FreqBarsCanvas'
@@ -130,6 +131,7 @@ export default function TalkPage() {
     return () => { abortControllerRef.current?.abort() }
   }, [])
 
+  const isMobile = useIsMobile()
   const vizSize = getVisualizerSize()
   const { getAmplitude } = useAudioAnalyser()
 
@@ -196,117 +198,144 @@ export default function TalkPage() {
     : 'Hold to talk · Double-tap for conversation'
 
   return (
-    <div className="relative flex flex-col items-center justify-center h-full overflow-hidden">
+    <div className="relative flex h-full overflow-hidden">
       <StarfieldCanvas />
 
-      {/* Visualizer container */}
+      {/* Left: talk machine — 2/3 on desktop when cards pending, full otherwise */}
       <div
-        className="relative flex items-center justify-center shrink-0"
-        style={{ width: vizSize, height: vizSize }}
+        className="flex flex-col items-center justify-center transition-all duration-300"
+        style={{ width: cards.length > 0 && !isMobile ? '66.666%' : '100%' }}
       >
-        <WaveCanvas ref={waveRef} size={vizSize} />
-        <ParticleNebulaCanvas
-          ref={particleRef}
-          size={vizSize}
-          onPointerDown={handleNebulaPointerDown}
-          onPointerUp={voice.onPointerUp}
-          onPointerCancel={voice.onPointerCancel}
-        />
-        <FreqBarsCanvas ref={freqBarsRef} size={vizSize} />
-        <HUDRingsSVG ringSpeed={voice.visualParams.ringSpeed} size={vizSize} />
+        {/* Visualizer container */}
+        <div
+          className="relative flex items-center justify-center shrink-0"
+          style={{ width: vizSize, height: vizSize }}
+        >
+          <WaveCanvas ref={waveRef} size={vizSize} />
+          <ParticleNebulaCanvas
+            ref={particleRef}
+            size={vizSize}
+            onPointerDown={handleNebulaPointerDown}
+            onPointerUp={voice.onPointerUp}
+            onPointerCancel={voice.onPointerCancel}
+          />
+          <FreqBarsCanvas ref={freqBarsRef} size={vizSize} />
+          <HUDRingsSVG ringSpeed={voice.visualParams.ringSpeed} size={vizSize} />
 
-        {/* REC indicator — visible only during LISTENING */}
-        {talkState === 'LISTENING' && (
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: 10 }}
-          >
-            <div className="flex items-center gap-1">
-              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'rgba(220,38,38,0.9)', boxShadow: '0 0 8px rgba(220,38,38,0.7)' }} />
-              <span style={{ fontSize: '10px', color: 'rgba(196,181,253,0.85)', letterSpacing: '2px', fontFamily: 'monospace' }}>REC</span>
+          {/* REC indicator — visible only during LISTENING */}
+          {talkState === 'LISTENING' && (
+            <div
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              style={{ zIndex: 10 }}
+            >
+              <div className="flex items-center gap-1">
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'rgba(220,38,38,0.9)', boxShadow: '0 0 8px rgba(220,38,38,0.7)' }} />
+                <span style={{ fontSize: '10px', color: 'rgba(196,181,253,0.85)', letterSpacing: '2px', fontFamily: 'monospace' }}>REC</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Dashed spinning ring — visible during PROCESSING */}
-        {talkState === 'PROCESSING' && (
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: 10 }}
-          >
+          {/* Dashed spinning ring — visible during PROCESSING */}
+          {talkState === 'PROCESSING' && (
             <div
-              style={{
-                width: vizSize * 0.7,
-                height: vizSize * 0.7,
-                borderRadius: '50%',
-                border: '2px dashed rgba(139,92,246,0.5)',
-                borderTopColor: 'rgba(139,92,246,0.9)',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
-          </div>
-        )}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              style={{ zIndex: 10 }}
+            >
+              <div
+                style={{
+                  width: vizSize * 0.7,
+                  height: vizSize * 0.7,
+                  borderRadius: '50%',
+                  border: '2px dashed rgba(139,92,246,0.5)',
+                  borderTopColor: 'rgba(139,92,246,0.9)',
+                  animation: 'spin 1s linear infinite',
+                }}
+              />
+            </div>
+          )}
 
-        {/* Ripple burst — one-shot on press */}
-        {showRipple && (
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            style={{ zIndex: 9 }}
-          >
+          {/* Ripple burst — one-shot on press */}
+          {showRipple && (
             <div
-              style={{
-                width: vizSize * 0.6,
-                height: vizSize * 0.6,
-                borderRadius: '50%',
-                border: '2px solid rgba(139,92,246,0.7)',
-                animation: 'ripple-out 0.4s ease-out forwards',
-              }}
-            />
-          </div>
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              style={{ zIndex: 9 }}
+            >
+              <div
+                style={{
+                  width: vizSize * 0.6,
+                  height: vizSize * 0.6,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(139,92,246,0.7)',
+                  animation: 'ripple-out 0.4s ease-out forwards',
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* State label */}
+        <p
+          className="font-mono text-[10px] tracking-[3px] uppercase mt-3 z-10"
+          style={{ color: 'rgba(196,181,253,0.5)' }}
+        >
+          {statusLabel}
+        </p>
+
+        {/* Conversation timer */}
+        {isConversation && conversationTimeLeft > 0 && (
+          <p
+            className="font-mono text-[10px] tracking-[2px] z-10"
+            style={{ color: 'rgba(139,92,246,0.6)' }}
+          >
+            {formatTime(conversationTimeLeft)}
+          </p>
         )}
 
-        {/* Knowledge cards */}
+        <p
+          className="font-mono text-[9px] tracking-[2px] uppercase mb-6 z-10"
+          style={{ color: 'rgba(196,181,253,0.2)' }}
+        >
+          {hintText}
+        </p>
+
+        <div className="z-10 w-full flex flex-col items-center">
+          <TalkInput
+            transcript={voice.transcript}
+            inputText={voice.inputText}
+            messages={messages}
+            onInputChange={voice.setInputText}
+            onSend={(text) => voice.sendText(text)}
+          />
+        </div>
+      </div>
+
+      {/* Right: cards panel — desktop only, 1/3, only when pending cards exist */}
+      {cards.length > 0 && !isMobile && (
+        <div
+          className="z-10 overflow-hidden transition-all duration-300"
+          style={{
+            width: '33.333%',
+            borderLeft: '1px solid rgba(139,92,246,0.1)',
+          }}
+        >
+          <KnowledgeCards
+            cards={cards}
+            savedCards={savedCards}
+            onDismiss={dismiss}
+            onSave={handleSaveCard}
+          />
+        </div>
+      )}
+
+      {/* Mobile drawer — always rendered when content exists (handles its own visibility) */}
+      {isMobile && (
         <KnowledgeCards
           cards={cards}
+          savedCards={savedCards}
           onDismiss={dismiss}
           onSave={handleSaveCard}
         />
-      </div>
-
-      {/* State label */}
-      <p
-        className="font-mono text-[10px] tracking-[3px] uppercase mt-3 z-10"
-        style={{ color: 'rgba(196,181,253,0.5)' }}
-      >
-        {statusLabel}
-      </p>
-
-      {/* Conversation timer */}
-      {isConversation && conversationTimeLeft > 0 && (
-        <p
-          className="font-mono text-[10px] tracking-[2px] z-10"
-          style={{ color: 'rgba(139,92,246,0.6)' }}
-        >
-          {formatTime(conversationTimeLeft)}
-        </p>
       )}
-
-      <p
-        className="font-mono text-[9px] tracking-[2px] uppercase mb-6 z-10"
-        style={{ color: 'rgba(196,181,253,0.2)' }}
-      >
-        {hintText}
-      </p>
-
-      <div className="z-10 w-full flex flex-col items-center">
-        <TalkInput
-          transcript={voice.transcript}
-          inputText={voice.inputText}
-          messages={messages}
-          onInputChange={voice.setInputText}
-          onSend={(text) => voice.sendText(text)}
-        />
-      </div>
     </div>
   )
 }
