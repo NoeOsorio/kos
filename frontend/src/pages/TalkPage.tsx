@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useVoiceInteraction } from '../hooks/useVoiceInteraction'
 import type { Message } from '../hooks/useVoiceInteraction'
-import { useAudioAnalyser } from '../hooks/useAudioAnalyser'
 import { useKnowledgeCards } from '../hooks/useKnowledgeCards'
 import { useIsMobile } from '../hooks/useIsMobile'
 import StarfieldCanvas from '../components/talk/StarfieldCanvas'
@@ -147,7 +146,7 @@ export default function TalkPage() {
 
   const isMobile = useIsMobile()
   const vizSize = getVisualizerSize()
-  const { getAmplitude } = useAudioAnalyser()
+  const { getAmplitude } = voice
 
   const freqBarsRef = useRef<FreqBarsHandle>(null)
   const particleRef  = useRef<ParticleNebulaHandle>(null)

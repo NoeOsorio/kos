@@ -30,6 +30,8 @@ export interface UseVoiceInteractionReturn {
   onPointerUp: () => void
   onPointerCancel: () => void
   sendText: (text: string) => void
+  /** Live mic amplitude (0–1). Use this for animations — avoids a duplicate AudioContext. */
+  getAmplitude: () => number
 }
 
 const SILENCE_THRESHOLD = 0.02
@@ -287,5 +289,6 @@ export function useVoiceInteraction({
     onPointerUp,
     onPointerCancel,
     sendText,
+    getAmplitude,
   }
 }
