@@ -11,6 +11,10 @@ import ParticleNebulaCanvas, { type ParticleNebulaHandle } from '../components/t
 import WaveCanvas, { type WaveCanvasHandle } from '../components/talk/WaveCanvas'
 import TalkInput from '../components/talk/TalkInput'
 import KnowledgeCards from '../components/talk/KnowledgeCards'
+import ModeSelector from '../components/talk/ModeSelector'
+import SourceCitations from '../components/talk/SourceCitations'
+import type { TalkMode } from '../components/talk/ModeSelector'
+import type { Source } from '../components/talk/SourceCitations'
 import type { NewTopicCard } from '../hooks/useKnowledgeCards'
 
 function getVisualizerSize(): number {
@@ -30,6 +34,8 @@ function formatTime(seconds: number): string {
 
 export default function TalkPage() {
   const [messages, setMessages] = useState<Message[]>([])
+  const [chatMode, setChatMode] = useState<TalkMode>('socratic')
+  const [sources, setSources] = useState<Source[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
   const { cards, addCards, dismiss, save, clearAll, savedCards } = useKnowledgeCards()
   const voiceRef = useRef<ReturnType<typeof useVoiceInteraction> | null>(null)
@@ -40,13 +46,14 @@ export default function TalkPage() {
     const controller = new AbortController()
     abortControllerRef.current = controller
     clearAll()
+    setSources([])
     setMessages(prev => [...prev, { role: 'user', content: text }])
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: windowed }),
+        body: JSON.stringify({ messages: windowed, mode: chatMode }),
         signal: controller.signal,
       })
 
@@ -73,6 +80,13 @@ export default function TalkPage() {
             if (!part.startsWith('data: ')) continue
             const token = part.slice(6)
             if (token === '[DONE]') break
+            if (token.startsWith('[SOURCES]')) {
+              try {
+                const payload = JSON.parse(token.slice(9))
+                setSources(payload.sources ?? [])
+              } catch { /* ignore malformed */ }
+              continue
+            }
             if (firstToken) { voiceRef.current?.firstTokenReceived(); firstToken = false }
             fullResponse += token
             voiceRef.current?.setTranscript(fullResponse)
@@ -116,7 +130,7 @@ export default function TalkPage() {
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') voiceRef.current?.streamComplete()
     }
-  }, [clearAll, addCards, save])
+  }, [clearAll, addCards, save, chatMode])
 
   const voice = useVoiceInteraction({
     messages,
@@ -292,11 +306,15 @@ export default function TalkPage() {
         )}
 
         <p
-          className="font-mono text-[9px] tracking-[2px] uppercase mb-6 z-10"
+          className="font-mono text-[9px] tracking-[2px] uppercase mb-4 z-10"
           style={{ color: 'rgba(196,181,253,0.2)' }}
         >
           {hintText}
         </p>
+
+        <div className="z-10 mb-4">
+          <ModeSelector mode={chatMode} onChange={setChatMode} />
+        </div>
 
         <div className="z-10 w-full flex flex-col items-center">
           <TalkInput
@@ -306,6 +324,11 @@ export default function TalkPage() {
             onInputChange={voice.setInputText}
             onSend={(text) => voice.sendText(text)}
           />
+          {sources.length > 0 && (
+            <div style={{ width: '100%', maxWidth: '480px', padding: '0 16px' }}>
+              <SourceCitations sources={sources} />
+            </div>
+          )}
         </div>
       </div>
 
