@@ -52,3 +52,5 @@ htmlcov/
 .node-compile-cache/
 .node-compile-cache/*
 node-compile-cache/
+# Supabase CLI local state
+supabase/.temp/
